@@ -445,7 +445,7 @@ let unsubs=[];
 function startData(fs){
   const timer=setTimeout(()=>{if(!S.loaded)setStatus('Todavía no se pueden cargar los productos. Revisa el internet.')},10000);
   const denied=e=>{clearTimeout(timer);S.loaded=true;S.canWrite=false;
-    setStatus(e&&e.code==='permission-denied'?'Esta cuenta no tiene permiso. Pide que agreguen tu correo a la tienda.':'No se pudieron cargar los datos. Cierra y vuelve a abrir la página.');render()};
+    setStatus(e&&e.code==='permission-denied'?'La cuenta '+(S.email||'')+' no tiene permiso. Agrega ese correo en las reglas de Firebase.':'No se pudieron cargar los datos. Cierra y vuelve a abrir la página.');render()};
   unsubs.push(onSnapshot(collection(fs,'products'),{includeMetadataChanges:true},snap=>{
     S.products=snap.docs.map(d=>({id:d.id,...d.data()}));
     S.loaded=true;clearTimeout(timer);setStatus(snap.metadata.fromCache&&!navigator.onLine?'Sin internet: puedes seguir vendiendo, se guardará al volver la señal.':'');
@@ -460,13 +460,14 @@ function init(){
   const fs=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})});
   const auth=getAuth(app);
   S.db=makeAdapter(fs);S.inc=n=>increment(n);
+  const prov=new GoogleAuthProvider();prov.setCustomParameters({prompt:'select_account'});
   $('#loginbtn').addEventListener('click',async()=>{$('#loginmsg').textContent='';
-    try{await signInWithPopup(auth,new GoogleAuthProvider())}
-    catch(e){if(e&&e.code==='auth/popup-blocked')signInWithRedirect(auth,new GoogleAuthProvider());else if(e&&e.code!=='auth/popup-closed-by-user')$('#loginmsg').textContent='No se pudo entrar. Intenta otra vez.'}});
+    try{await signInWithPopup(auth,prov)}
+    catch(e){if(e&&e.code==='auth/popup-blocked')signInWithRedirect(auth,prov);else if(e&&e.code!=='auth/popup-closed-by-user')$('#loginmsg').textContent='No se pudo entrar. Intenta otra vez.'}});
   $('#logout').addEventListener('click',()=>signOut(auth));
   onAuthStateChanged(auth,user=>{
     unsubs.forEach(u=>u());unsubs=[];
-    if(user){$('#login').hidden=true;$('#logout').hidden=false;S.canWrite=true;S.loaded=false;render();startData(fs)}
+    if(user){S.email=user.email||'';$('#login').hidden=true;$('#logout').hidden=false;S.canWrite=true;S.loaded=false;render();startData(fs)}
     else{$('#login').hidden=false;$('#logout').hidden=true;S.products=[];S.sales=[];S.cart=[];render()}
   });
   render();
